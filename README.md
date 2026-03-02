@@ -5,3 +5,10 @@
 - processing.ipynb utiliza o csv ajustado para fazer os treinamentos
 
 - modelo fica salvo em src/model
+
+##Para rodar a API
+
+- docker build -t passos-magicos-api .
+
+- docker compose up --build
+
