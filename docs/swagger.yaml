@@ -1,0 +1,315 @@
+openapi: 3.0.3
+info:
+  title: Passos Magicos - API de Risco de Defasagem
+  description: >
+    Prediz o cluster de risco de defasagem escolar de estudantes da Associacao
+    Passos Magicos usando um modelo KMeans customizado.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Ambiente local
+tags:
+  - name: Infraestrutura
+    description: Endpoints de saude da aplicacao
+  - name: Predicao
+    description: Endpoints de predicao de risco
+paths:
+  /health:
+    get:
+      tags:
+        - Infraestrutura
+      summary: Verifica status da API e do modelo
+      operationId: health
+      responses:
+        "200":
+          description: API acessivel (ok ou degraded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthOutput"
+              examples:
+                ok:
+                  summary: Modelo carregado
+                  value:
+                    status: ok
+                    model_loaded: true
+                    model_k: 5
+                    features:
+                      - Nível de Defasagem
+                      - Indicador de Aprendizagem
+                degraded:
+                  summary: Falha ao carregar modelo
+                  value:
+                    status: degraded
+                    model_loaded: false
+  /predict:
+    post:
+      tags:
+        - Predicao
+      summary: Predicao para um estudante
+      description: >
+        Retorna cluster, score, nivel de risco e gap de fase. Campos ausentes
+        sao imputados com media do conjunto de treino.
+      operationId: predict
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentInput"
+            examples:
+              aluno_alto_risco:
+                summary: Estudante com alto risco
+                value:
+                  Nível de Defasagem: -2
+                  Fase: 5
+                  Fase ideal: Fase 7 (2º EM)
+                  Atingiu Ponto de Virada: Não
+                  Indicador de Aprendizagem: 3.0
+                  Indicador de Engajamento: 2.5
+                  Indicador Psicossocial: 4.0
+                  Indicador de Adequação ao Nível: 3.0
+                  Indicador de Ponto de Virada: 4.0
+                  Índice de Desenvolvimento Educacional (INDE): 4.2
+              aluno_parcial:
+                summary: Estudante com dados parciais
+                value:
+                  Fase: 4
+                  Indicador de Aprendizagem: 5.0
+      responses:
+        "200":
+          description: Predicao realizada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionOutput"
+              example:
+                cluster: 3
+                risk_score: 1.2412
+                risk_level: Crítico
+                gap_fase: 2.0
+        "422":
+          description: Erro de validacao do payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+        "500":
+          description: Erro interno durante predicao
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                required:
+                  - detail
+  /predict/batch:
+    post:
+      tags:
+        - Predicao
+      summary: Predicao em lote
+      description: Recebe uma lista de estudantes e retorna uma predicao para cada.
+      operationId: predictBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchStudentInput"
+            example:
+              students:
+                - Nível de Defasagem: -2
+                  Fase: 5
+                  Fase ideal: Fase 7 (2º EM)
+                  Atingiu Ponto de Virada: Não
+                  Indicador de Aprendizagem: 3.0
+                  Indicador de Engajamento: 2.5
+                  Indicador Psicossocial: 4.0
+                  Indicador de Adequação ao Nível: 3.0
+                  Indicador de Ponto de Virada: 4.0
+                  Índice de Desenvolvimento Educacional (INDE): 4.2
+                - Fase: 4
+                  Indicador de Aprendizagem: 5.0
+      responses:
+        "200":
+          description: Predicoes realizadas com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchPredictionOutput"
+              example:
+                predictions:
+                  - cluster: 3
+                    risk_score: 1.2412
+                    risk_level: Crítico
+                    gap_fase: 2.0
+                  - cluster: 1
+                    risk_score: -0.124
+                    risk_level: Médio
+                    gap_fase: null
+                total: 2
+        "422":
+          description: Erro de validacao do payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+        "500":
+          description: Erro interno durante predicao em lote
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                required:
+                  - detail
+components:
+  schemas:
+    StudentInput:
+      type: object
+      properties:
+        "Nível de Defasagem":
+          type: number
+          nullable: true
+          description: Nivel de defasagem do aluno (negativo = defasado)
+          example: -1
+        Fase:
+          type: number
+          nullable: true
+          description: Fase atual do aluno no programa
+          example: 7
+        "Fase ideal":
+          type: string
+          nullable: true
+          description: "Fase ideal esperada (ex: 'Fase 8 (Universitários)')"
+          example: Fase 8 (Universitários)
+        "Atingiu Ponto de Virada":
+          type: string
+          nullable: true
+          description: "'Sim' ou 'Não'"
+          example: Não
+        "Indicador de Aprendizagem":
+          type: number
+          nullable: true
+          description: IDA - nota de 0 a 10
+          example: 4.0
+        "Indicador de Engajamento":
+          type: number
+          nullable: true
+          description: IEG - nota de 0 a 10
+          example: 4.1
+        "Indicador Psicossocial":
+          type: number
+          nullable: true
+          description: IPS - nota de 0 a 10
+          example: 5.6
+        "Indicador de Adequação ao Nível":
+          type: number
+          nullable: true
+          description: IAN - nota de 0 a 10
+          example: 5.0
+        "Indicador de Ponto de Virada":
+          type: number
+          nullable: true
+          description: IPV - nota de 0 a 10
+          example: 7.278
+        "Índice de Desenvolvimento Educacional (INDE)":
+          type: number
+          nullable: true
+          description: INDE - indice geral de desenvolvimento
+          example: 5.783
+    PredictionOutput:
+      type: object
+      required:
+        - cluster
+        - risk_score
+        - risk_level
+        - gap_fase
+      properties:
+        cluster:
+          type: integer
+          description: Cluster de risco atribuido (0 a 4)
+        risk_score:
+          type: number
+          description: Score de risco calculado (maior = mais risco)
+        risk_level:
+          type: string
+          description: Nivel de risco (Baixo | Médio | Alto | Crítico)
+        gap_fase:
+          type: number
+          nullable: true
+          description: Diferenca entre fase atual e fase ideal
+    BatchStudentInput:
+      type: object
+      required:
+        - students
+      properties:
+        students:
+          type: array
+          minItems: 1
+          description: Lista de estudantes para predicao
+          items:
+            $ref: "#/components/schemas/StudentInput"
+    BatchPredictionOutput:
+      type: object
+      required:
+        - predictions
+        - total
+      properties:
+        predictions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PredictionOutput"
+        total:
+          type: integer
+          description: Total de estudantes processados
+    HealthOutput:
+      type: object
+      required:
+        - status
+        - model_loaded
+      properties:
+        status:
+          type: string
+          description: Status da API (ok | degraded)
+        model_loaded:
+          type: boolean
+          description: Indica se o modelo esta carregado em memoria
+        model_k:
+          type: integer
+          nullable: true
+          description: Quantidade de clusters do modelo
+        features:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: Lista de features usadas no modelo
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationError"

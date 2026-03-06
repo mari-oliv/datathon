@@ -14,6 +14,12 @@
 
 - docker compose up --build
 
+## Documentacao Swagger
+
+- Arquivo Swagger: `docs/swagger.yaml`
+- Swagger UI nativo da aplicacao FastAPI (com a API rodando): `http://localhost:8000/docs`
+- Editor online para visualizar o YAML: https://editor.swagger.io/
+
 ## Testes de limpeza, processamento e modelos
 
 ### Para rodar os testes 
