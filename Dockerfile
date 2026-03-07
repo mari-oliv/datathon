@@ -23,7 +23,9 @@ RUN useradd -m appuser
 
 # copia código da aplicação com ownership correto para o appuser
 COPY --chown=appuser:appuser app/       ./app/
-COPY --chown=appuser:appuser src/model/ ./src/model/
+COPY --chown=appuser:appuser src/       ./src/
+COPY --chown=appuser:appuser monitoring/ ./monitoring/
+COPY --chown=appuser:appuser scripts/   ./scripts/
 
 # variáveis de ambiente
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -31,6 +33,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000
 
 EXPOSE 8000
+EXPOSE 8501
 
 USER appuser
 
@@ -38,4 +41,6 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Entrypoint que inicia API (uvicorn) e Streamlit
+RUN chmod +x ./scripts/docker_entrypoint.sh || true
+CMD ["/bin/bash", "./scripts/docker_entrypoint.sh"]

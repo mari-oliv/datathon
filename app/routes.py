@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException
+from pathlib import Path
+import pandas as pd
 
 from app.model_loader import get_model
 from app.predictor import preprocess, predict_cluster, risk_level_from_score
@@ -110,3 +112,95 @@ def predict_batch(payload: BatchStudentInput):
     except Exception as exc:
         logger.exception("Erro na predição em lote: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# --- Monitoramento / métricas -------------------------------------------------
+
+
+@router.get("/monitor/metrics", tags=["Monitoramento"])
+def monitor_metrics():
+    """Retorna estatísticas simples do dataset e comparação com o modelo treinado.
+
+    - médias e desvios por feature
+    - missing rate
+    - delta entre média atual e média do treino (mu)
+    """
+    try:
+        try:
+            model = get_model()
+        except Exception as e:
+            logger.warning("Modelo não disponível para monitor/metrics: %s", e)
+            return {
+                "ok": False,
+                "error": "model_not_loaded",
+                "detail": "Modelo não foi carregado; verifique src/model/model.pkl ou inicialização do container.",
+                "remediation": "Coloque src/model/model.pkl na imagem ou monte ./src no container, ou gere o modelo com src/run_simulation.py --save-model",
+            }
+
+        risk_cols = model.get("risk_cols", [])
+        mu = list(model.get("mu", []))
+        sigma = list(model.get("sigma", []))
+
+        csv_path = Path(__file__).parent.parent / "src" / "base_dados_pede_2024_ajustado.csv"
+        if not csv_path.exists():
+            logger.warning("Dataset ausente em monitor/metrics: %s", csv_path)
+            return {
+                "ok": False,
+                "error": "dataset_not_found",
+                "detail": f"Dataset não encontrado: {csv_path}",
+                "remediation": "Monte o diretório ./src no container ou copie o CSV para /app/src/base_dados_pede_2024_ajustado.csv",
+            }
+
+        df = pd.read_csv(csv_path)
+
+        features = {}
+        for i, col in enumerate(risk_cols):
+            if col in df.columns:
+                s = pd.to_numeric(df[col], errors="coerce")
+                features[col] = {
+                    "mean": None if pd.isna(s.mean()) else float(s.mean()),
+                    "std": None if pd.isna(s.std()) else float(s.std()),
+                    "missing_rate": float(s.isna().mean()),
+                    "model_mu": float(mu[i]) if i < len(mu) else None,
+                    "model_sigma": float(sigma[i]) if i < len(sigma) else None,
+                    "delta_mu": None if pd.isna(s.mean()) or i >= len(mu) else float(s.mean() - mu[i]),
+                }
+            else:
+                features[col] = {"error": "column not present in dataset"}
+
+        resp = {
+            "n_rows": int(len(df)),
+            "model_k": model.get("k"),
+            "features": features,
+        }
+        return resp
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Erro ao coletar métricas: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+
+@router.get("/monitor/status", tags=["Monitoramento"])
+def monitor_status():
+    """Combina `health` e `monitor/metrics` em uma única resposta.
+
+    - `health`: estado da API e do carregamento do modelo
+    - `metrics`: estatísticas do dataset e comparações com o modelo (quando disponíveis)
+    """
+    # health pode levantar, mas a rota tenta sempre retornar informação útil
+    try:
+        h = health()
+        health_obj = h.dict() if hasattr(h, "dict") else h
+    except Exception:
+        health_obj = {"status": "degraded", "model_loaded": False}
+
+    try:
+        metrics = monitor_metrics()
+    except HTTPException as he:
+        metrics = {"ok": False, "error": "monitor_error", "detail": str(he.detail)}
+    except Exception as e:
+        metrics = {"ok": False, "error": "monitor_exception", "detail": str(e)}
+
+    return {"health": health_obj, "metrics": metrics}

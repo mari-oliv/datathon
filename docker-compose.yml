@@ -3,9 +3,10 @@ services:
     build: .
     ports:
       - "8000:8000"
+      - "8501:8501"
     volumes:
-      # permite atualizar o modelo sem rebuild
-      - ./src/model:/app/src/model:ro
+      # monta todo o diretório src para garantir dataset + modelo dentro do container
+      - ./src:/app/src:ro
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
