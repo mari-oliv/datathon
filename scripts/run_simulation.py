@@ -5,7 +5,6 @@ import argparse
 import pickle
 from pathlib import Path
 
-# garantir import do package src (pasta do projeto)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
@@ -29,7 +28,7 @@ def main(save_model: bool = False, out_path: str | None = None):
         print('Lendo:', csv_path)
         df = pd.read_csv(csv_path)
 
-        # preparo mínimo
+
         df['Fase_ideal_num'] = df['Fase ideal'].apply(parse_fase_ideal)
         df['gap_fase'] = df['Fase_ideal_num'] - df['Fase']
         df['pv_bool'] = normalize_bool_sim_nao(df['Atingiu Ponto de Virada'])

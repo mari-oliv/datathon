@@ -1,213 +1,68 @@
-## Passos Mágicos — Projeto: Limpeza, Processamento e Modelo
+# Passos Mágicos — API de Risco de Defasagem
 
-**Resumo / Objetivo**
-- Problema: prever o risco de defasagem escolar de estudantes da Associação Passos Mágicos.
-- Solução: pipeline completo de ML (pré-processamento → engenharia de features → treinamento KMeans → API para predição).
+Motivação
+- Dor: escolas e programas educacionais precisam identificar estudantes com risco de defasagem para priorizar intervenções.
+- O que o modelo resolve: classifica e pontua o risco de defasagem por estudante (cluster + score) permitindo priorização e monitoramento.
 
-**Stack tecnológica**
-- Python 3.x
-- pandas, numpy
-- FastAPI para a API
-- pickle para serialização do modelo
-- pytest para testes
-- Docker para empacotamento
+O que este projeto faz (resumo)
+- Pipeline de dados e engenharia de features a partir do dataset fornecido em `src/`.
+- Treinamento de um modelo KMeans customizado para agrupar alunos por perfil de risco.
+- API FastAPI para predição em tempo real e endpoints de monitoramento.
+- Dashboard Streamlit com métricas do dataset e distribuição por cluster.
 
----
+Rotas principais (API)
+- `GET /health` — status da API e modelo carregado
+- `GET /monitor/status` — health + métricas agregadas
+- `GET /monitor/metrics` — métricas por feature (média, std, missing, delta vs mu)
+- `POST /predict` — predição para um estudante (JSON)
+- `POST /predict/batch` — predição em lote (JSON)
+- `GET /docs` — Swagger UI interativo
 
-## Estrutura do projeto (principais arquivos)
-- `app/` : código da API (entrypoint `app/main.py`, `app/routes.py`, `app/predictor.py`, `app/model_loader.py`, `app/schemas.py`).
-- `src/` : scripts e notebooks de processamento e treinamento (`processing_and_models.py`, `data_cleaning.py`, `base_dados_pede_2024_ajustado.csv`).
-- `src/model/model.pkl` : modelo serializado usado pela API.
-- `docs/swagger.yaml` : definição OpenAPI/Swagger.
-- `tests/` : testes unitários existentes (`test_data_cleaning.py`, `test_processing_and_models.py`).
+Portas
+- `8000` → API (FastAPI / Uvicorn)
+- `8501` → Dashboard (Streamlit)
 
----
-
-## Como treinar o modelo (local)
-1. Crie e ative um ambiente virtual (recomendado):
+Quick start (recomendado)
+1. Clone o repositório
+2. Execute:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+make start
 ```
 
-2. Execute o script de treino/simulação (gera clusters e calcula métricas):
+Observações sobre `make start`
+- Tenta instalar dependências e iniciar localmente. Se a instalação falhar (ex.: compilação de `pydantic-core`), faz fallback para build/run em container; se o container também não estiver disponível, inicia em modo dev (foreground).
+
+Alternativas
+- Modo dev (foreground):
 
 ```bash
-python src/run_simulation.py
-```
-
-Observação: o repositório já contém `src/model/model.pkl` usado pela API. Para treinar e salvar o modelo gerado, há uma flag CLI que grava um `model.pkl` compatível com a API.
-
-### Salvar modelo treinado
-
-```bash
-# treina e salva em src/model/model.pkl
-python src/run_simulation.py --save-model
-
-# ou usar o helper
-python scripts/save_model.py
-```
-
----
-
-## Como rodar a API localmente
-
-1. Com ambiente virtual ativo e dependências instaladas:
-
-```bash
+make start-dev
+# ou
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+streamlit run monitoring/dashboard.py --server.port 8501 --server.address 0.0.0.0
 ```
 
-2. Usando container (API + Dashboard juntos)
+Containers
+- Build: `make build`
+- Run:   `make run` (o comando monta `./src` no container para garantir `model.pkl` e CSV)
 
-Observação: a imagem foi configurada para iniciar a API (`uvicorn`) e o dashboard Streamlit (`monitoring/dashboard.py`) no mesmo container. O `Dockerfile` expõe as portas `8000` (API) e `8501` (Streamlit). Antes de buildar, confirme que `src/model/model.pkl` está presente e atualizado.
+Arquitetura e tecnologias
+- Entrypoint API: `app/main.py` (FastAPI, lifespan carrega o modelo)
+- Rotas e validação: `app/routes.py`, `app/schemas.py` (Pydantic)
+- Lógica de predição: `app/predictor.py` (pré-processamento e score)
+- Loader/serialização do modelo: `app/model_loader.py` e `src/model/model.pkl`
+- Pipeline de treino/simulação: `src/run_simulation.py`, `src/processing_and_models.py`
+- Dashboard: `monitoring/dashboard.py` (Streamlit + Plotly)
+- Execução local: `scripts/run_monitor.sh` / `scripts/stop_monitor.sh` (inicia/para API + Streamlit em background)
+- Dev / automação: `Makefile` com alvos `install`, `start`, `start-dev`, `build`, `run`, `test`, `logs`.
 
-Build da imagem:
+Dependências
+- Versões fixadas em `requirements.txt` para consistência. Observação: em algumas plataformas pode ser necessário instalar toolchains nativos (Xcode CLT, Rust) para compilar dependências como `pydantic-core` se não houver wheel disponível.
 
-```bash
-# com Podman (recomendado se o Docker tiver conflito de versão)
-podman build -t passos-magicos-api .
+Testes
+- `make test` (executa `pytest`)
 
-# ou com Docker
-docker build -t passos-magicos-api .
-```
+Logs
+- `logs/api.log` e `logs/streamlit.log` (quando iniciado pelo script `scripts/run_monitor.sh`)
 
-Rodar o container (foreground):
-
-```bash
-podman run --rm -p 8000:8000 -p 8501:8501 passos-magicos-api
-# ou com Docker
-docker run --rm -p 8000:8000 -p 8501:8501 passos-magicos-api
-```
-
-Rodar em background (detached):
-
-```bash
-podman run -d --name passos-api -p 8000:8000 -p 8501:8501 passos-magicos-api
-podman logs -f passos-api
-
-# ou Docker
-docker run -d --name passos-api -p 8000:8000 -p 8501:8501 passos-magicos-api
-docker logs -f passos-api
-```
-
-O entrypoint da imagem inicia ambos os processos; se um encerrar, o container também encerra.
-
-Se usar `docker-compose.yml`, a porta `8501` já está mapeada e você pode subir com:
-
-```bash
-docker compose up --build
-```
-
-Rápido — URLs e testes após o container subir:
-
-- API health: http://localhost:8000/health
-- Swagger (docs): http://localhost:8000/docs
-- Dashboard Streamlit: http://localhost:8501
-
-- Teste rápido via curl:
-
-```bash
-curl -s http://localhost:8000/health | jq
-curl -s -X POST http://localhost:8000/predict -H 'Content-Type: application/json' -d '{"Nível de Defasagem": -1, "Fase":7}'
-```
-
-3. Documentação interativa (Swagger) disponível em: `http://localhost:8000/docs`
-
----
-
-## Exemplos de chamadas à API
-
-- Health check:
-
-```bash
-curl -s http://localhost:8000/health | jq
-```
-
-- Predição (única):
-
-```bash
-curl -s -X POST http://localhost:8000/predict \
-	-H 'Content-Type: application/json' \
-	-d '{
-		"Nível de Defasagem": -1,
-		"Fase": 7,
-		"Fase ideal": "Fase 8",
-		"Atingiu Ponto de Virada": "Não",
-		"Indicador de Aprendizagem": 4.0,
-		"Indicador de Engajamento": 4.1,
-		"Indicador Psicossocial": 5.6,
-		"Indicador de Adequação ao Nível": 5.0,
-		"Indicador de Ponto de Virada": 7.278,
-		"Índice de Desenvolvimento Educacional (INDE)": 5.783
-	}'
-```
-
-- Predição em lote: enviar `{ "students": [ {...}, {...} ] }` para `/predict/batch`.
-
----
-
-## Passos do pipeline de Machine Learning
-- Pré-processamento dos dados (`src/data_cleaning.py`, notebooks em `src/`)
-- Engenharia de features (ver `src/processing_and_models.py` e `src/run_simulation.py`)
-- Padronização (média/desvio)
-- Treinamento KMeans (implementação em `src/processing_and_models.py`)
-- Avaliação: inércia e inspeção de `cluster_card5`
-- Serialização do modelo: `src/model/model.pkl` (pickle)
-
----
-
-## Testes e cobertura
-- Executar testes: `pytest -v`
-- Checar cobertura: `pytest --cov --cov-report=term-missing`
-- Requisito do datathon: cobertura mínima de 80% (atualizar/expandir testes conforme necessário).
-
----
-
-## Monitoramento e logs
-- A aplicação grava logs em `/tmp/app.log` e também envia para stdout.
-- Para monitoramento de drift, recomenda-se adicionar um job que armazene estatísticas de features (média, var) periodicamente e visualize num dashboard.
-
-### Dashboard de Monitoramento (Streamlit)
-
-Um dashboard simples foi adicionado em `monitoring/dashboard.py`. Ele carrega `src/model/model.pkl` e `src/base_dados_pede_2024_ajustado.csv` e mostra:
-- estatísticas por feature (média, desvio, missing rate)
-- comparação entre média atual e média do treino (delta)
-- distribuição aproximada por cluster aplicando os centroides do modelo
-
-Instalação e execução:
-```bash
-pip install streamlit plotly
-streamlit run monitoring/dashboard.py
-```
-
-O dashboard também pode consumir o endpoint `GET /monitor/metrics` exposto pela API (se a API estiver rodando em `localhost:8000`).
-
-### Executar API + Dashboard localmente em background (scripts)
-
-O repositório traz dois scripts para iniciar/parar a API e o dashboard em background (`.venv` é ativado se presente):
-
-```bash
-chmod +x scripts/run_monitor.sh scripts/stop_monitor.sh
-./scripts/run_monitor.sh   # inicia uvicorn + streamlit em background
-./scripts/stop_monitor.sh  # para os processos
-```
-
-Logs são gravados em `logs/api.log` e `logs/streamlit.log`.
-
----
-
-## Observações e lacunas identificadas (sugestões rápidas)
-- O repositório já implementa: pipeline de pré-processamento, KMeans customizado, API FastAPI e testes unitários de utilitários.
-- Falta um step automático que serializa o modelo gerado por `run_simulation.py` em `src/model/model.pkl` (hoje o `model.pkl` já existe, mas não há comando documentado para regenerá-lo).
-- Documentação no README foi ampliada para atender aos itens do anexo; recomendo adicionar um pequeno script `scripts/save_model.py` para salvar o modelo após treino.
-
-Se quiser, eu atualizo o `run_simulation.py` para salvar automaticamente `src/model/model.pkl` e adiciono um exemplo de `scripts/save_model.py` e um comando Makefile.
-
-Se quiser, eu atualizo o `run_simulation.py` para salvar automaticamente `src/model/model.pkl` e adiciono um exemplo de `scripts/save_model.py` e um comando Makefile.
-
-## Deploy
-
-- A API será deployada no Render.

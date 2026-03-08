@@ -20,7 +20,10 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # cria usuário não-root antes de copiar arquivos
 RUN useradd -m appuser
-
+# garantir bash disponível em imagens slim (evita /bin/bash missing/perm erros)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 # copia código da aplicação com ownership correto para o appuser
 COPY --chown=appuser:appuser app/       ./app/
 COPY --chown=appuser:appuser src/       ./src/
@@ -43,4 +46,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 # Entrypoint que inicia API (uvicorn) e Streamlit
 RUN chmod +x ./scripts/docker_entrypoint.sh || true
-CMD ["/bin/bash", "./scripts/docker_entrypoint.sh"]
+CMD ["bash", "-c", "/app/scripts/docker_entrypoint.sh"]

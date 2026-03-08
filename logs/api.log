@@ -1,0 +1,10 @@
+INFO:     Started server process [71755]
+INFO:     Waiting for application startup.
+2026-03-07 21:09:20,265 | INFO     | app.main | Iniciando aplicação — carregando modelo...
+2026-03-07 21:09:20,276 | INFO     | app.model_loader | Modelo carregado | k=5 | features=['Nível de Defasagem', 'Fase', 'Fase_ideal_num', 'gap_fase', 'Indicador de Aprendizagem', 'Indicador de Engajamento', 'Indicador Psicossocial', 'Indicador de Adequação ao Nível', 'Indicador de Ponto de Virada', 'Índice de Desenvolvimento Educacional (INDE)']
+2026-03-07 21:09:20,277 | INFO     | app.main | Modelo carregado com sucesso.
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 8000): [errno 48] address already in use
+INFO:     Waiting for application shutdown.
+2026-03-07 21:09:20,278 | INFO     | app.main | Aplicação encerrada.
+INFO:     Application shutdown complete.

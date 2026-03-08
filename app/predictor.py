@@ -59,7 +59,7 @@ def preprocess(student_data: dict, model: dict) -> tuple[np.ndarray, float, floa
 
     pv_bool = _normalize_bool(student_data.get("Atingiu Ponto de Virada"))
 
-    #monta linha do DataFrame
+
     row: dict[str, float | None] = {}
     for col in risk_cols:
         if col == "Fase_ideal_num":

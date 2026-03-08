@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 set -euo pipefail
 
 # Inicia a API (uvicorn) e o Streamlit dashboard em background.
@@ -13,7 +12,6 @@ mkdir -p "$LOGDIR"
 
 # ativa venv se existir
 if [ -f "$VENV/bin/activate" ]; then
-  # shellcheck disable=SC1090
   source "$VENV/bin/activate"
 fi
 
@@ -33,3 +31,7 @@ echo "$API_PID $ST_PID" > "$PIDFILE"
 echo "Started. API PID=$API_PID, Streamlit PID=$ST_PID"
 echo "API logs: $API_LOG"
 echo "Streamlit logs: $STREAMLIT_LOG"
+
+mkdir -p logs
+chmod +x scripts/run_monitor.sh
+./scripts/run_monitor.sh

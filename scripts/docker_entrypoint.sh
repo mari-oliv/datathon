@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Start Uvicorn and Streamlit; when one exits, stop the other.
+# Start Uvicorn e Streamlit
 
 CSV_PATH="/app/src/base_dados_pede_2024_ajustado.csv"
 MODEL_PATH="/app/src/model/model.pkl"
@@ -27,7 +27,7 @@ echo "Starting API (uvicorn) on 0.0.0.0:${PORT}"
 uvicorn app.main:app --host 0.0.0.0 --port "$PORT" &
 API_PID=$!
 
-# Optionally disable Streamlit via DISABLE_STREAMLIT=1
+# Opcional - desativar Streamlit
 if [ "${DISABLE_STREAMLIT:-0}" = "1" ]; then
 	echo "DISABLE_STREAMLIT=1 -> skipping Streamlit startup"
 	ST_PID=""
@@ -37,14 +37,13 @@ else
 	ST_PID=$!
 fi
 
-# wait for any started process to exit
+
 if [ -n "${ST_PID:-}" ]; then
 	wait -n "$API_PID" "$ST_PID" || true
 else
 	wait "$API_PID" || true
 fi
 
-# kill remaining processes if they exist
 kill "$API_PID" 2>/dev/null || true
 if [ -n "${ST_PID:-}" ]; then
 	kill "$ST_PID" 2>/dev/null || true

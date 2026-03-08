@@ -189,7 +189,6 @@ def monitor_status():
     - `health`: estado da API e do carregamento do modelo
     - `metrics`: estatísticas do dataset e comparações com o modelo (quando disponíveis)
     """
-    # health pode levantar, mas a rota tenta sempre retornar informação útil
     try:
         h = health()
         health_obj = h.dict() if hasattr(h, "dict") else h
